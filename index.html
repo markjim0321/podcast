@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Podcast 播放</title>
+  <meta name="color-scheme" content="light">
+  <style>
+    /* —— 基本樣式（白底行動優先） —— */
+    :root{--fg:#111;--muted:#6b7280;--line:#e5e7eb;--card:#fff;--accent:#111}
+    *{box-sizing:border-box}
+    html,body{margin:0;background:#fff;color:var(--fg);font-family:system-ui,-apple-system,"Noto Sans TC",Segoe UI,Arial,sans-serif}
+    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line)}
+    .bar{max-width:980px;margin:0 auto;padding:12px 16px;display:flex;gap:10px;align-items:center}
+    .t{font-size:18px;font-weight:700;margin-right:auto}
+    .controls{display:flex;gap:8px;flex:1}
+    .select{flex:1;min-width:0;appearance:none;background:#fff;color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+    .wrap{max-width:980px;margin:0 auto;padding:14px 16px}
+    .grid{display:grid;gap:10px}
+    .card{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:12px}
+    .title{font-weight:700;line-height:1.35}
+    .sub{margin-top:4px;font-size:12px;color:var(--muted)}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+    .btn{border:0;border-radius:10px;background:var(--accent);color:#fff;padding:10px 14px;font-size:14px}
+    .empty{color:var(--muted);text-align:center;padding:28px 0}
+    footer.player{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line)}
+    .player-inner{max-width:980px;margin:0 auto;padding:8px 16px}
+    #now{font-size:14px;margin:4px 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    audio{width:100%}
+    /* 小螢幕優化 */
+    @media (min-width:720px){
+      .controls{max-width:560px}
+      .grid{grid-template-columns:repeat(2,1fr)}
+    }
+  </style>
+
+  <meta property="og:type" content="website">
+<meta property="og:title" content="Podcast 播放｜自然科 第一冊">
+<meta property="og:description" content="線上收聽：生命的特性、養分、生物的運輸與防禦、協調作用、恆定性。">
+<meta property="og:url" content="https://markjim0321.github.io/podcast/">
+<meta property="og:image" content="https://your-domain.example/cover.jpg">  <!-- 換成一張 1200x630 圖 -->
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="t">Podcast 播放</div>
+      <div class="controls">
+        <select id="subject" class="select" title="選擇科目">
+          <option value="">全部科目</option>
+        </select>
+        <select id="volume" class="select" title="選擇冊次">
+          <option value="">全部冊次</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="list" class="grid"></div>
+    <div id="empty" class="empty" style="display:none;">沒有資料</div>
+  </main>
+
+  <footer class="player">
+    <div class="player-inner">
+      <div id="now">尚未播放</div>
+      <audio id="player" controls preload="metadata"></audio>
+    </div>
+  </footer>
+
+  <script>
+    // 取元素
+    const subjectSel = document.getElementById('subject');
+    const volumeSel  = document.getElementById('volume');
+    const listEl     = document.getElementById('list');
+    const emptyEl    = document.getElementById('empty');
+    const player     = document.getElementById('player');
+    const now        = document.getElementById('now');
+
+    let data = [];           // 全部清單
+    let subjects = new Set();// 科目集合
+    let volumes  = new Set();// 冊次集合（從 URL 夾層 /audio/<科目>/<冊>/ 取）
+
+    // 讀 podcasts.json
+    fetch('./podcasts.json', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(items => {
+        data = Array.isArray(items) ? items : [];
+        indexFilters(data);
+        renderFilterOptions();
+        renderList();
+      })
+      .catch(err => {
+        console.error('讀取 podcasts.json 失敗：', err);
+        showEmpty('清單載入失敗');
+      });
+
+    // 建立篩選（科目、冊次）
+    function indexFilters(items){
+      subjects.clear(); volumes.clear();
+      for(const it of items){
+        if(it.subject) subjects.add(it.subject);
+        const vol = extractVolume(it.url);
+        if(vol) volumes.add(vol);
+        // 把解析到的冊次放在物件上，之後不用重算
+        it._volume = vol || '';
+      }
+    }
+
+    // 從 URL 抓冊次：.../audio/<subject>/<volume>/檔名
+    function extractVolume(url){
+      try{
+        const u = new URL(url);
+        const parts = decodeURI(u.pathname).split('/').filter(Boolean);
+        // pathname 例：/podcast_programe/audio/自然/第一冊/XXX.wav
+        // 找到 "audio" 的位置，volume 就是其後第 2 個
+        const idx = parts.indexOf('audio');
+        if(idx >= 0 && parts.length > idx + 2) return parts[idx+2];
+      }catch(e){ /* ignore */ }
+      return '';
+    }
+
+    // 填入下拉選項
+    function renderFilterOptions(){
+      // 科目
+      for(const s of Array.from(subjects).sort()){
+        const opt = document.createElement('option');
+        opt.value = s; opt.textContent = s;
+        subjectSel.appendChild(opt);
+      }
+      // 冊次
+      for(const v of Array.from(volumes).sort()){
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = v;
+        volumeSel.appendChild(opt);
+      }
+    }
+
+    // 篩選 + 渲染清單
+    function renderList(){
+      const subj = subjectSel.value;
+      const vol  = volumeSel.value;
+
+      // 篩選
+      const rows = data.filter(it =>
+        (!subj || it.subject === subj) &&
+        (!vol  || it._volume === vol)
+      );
+
+      listEl.innerHTML = '';
+      if(!rows.length) return showEmpty('沒有符合條件的檔案');
+
+      emptyEl.style.display = 'none';
+
+      // 依日期新到舊
+      rows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+
+      for(const it of rows){
+        const card  = document.createElement('div');
+        card.className = 'card';
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = it.title || '(未命名)';
+
+        const sub   = document.createElement('div');
+        sub.className = 'sub';
+        const parts = [];
+        if(it.subject) parts.push(it.subject);
+        if(it._volume) parts.push(it._volume);
+        if(it.date)    parts.push(it.date);
+        if(it.duration)parts.push(it.duration);
+        sub.textContent = parts.join(' ｜ ');
+
+        const row   = document.createElement('div');
+        row.className = 'row';
+
+        const btn   = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = '播放';
+        btn.onclick = () => play(it);
+
+        row.appendChild(btn);
+
+        card.appendChild(title);
+        card.appendChild(sub);
+        card.appendChild(row);
+        listEl.appendChild(card);
+      }
+    }
+
+    function showEmpty(msg){
+      listEl.innerHTML = '';
+      emptyEl.style.display = '';
+      emptyEl.textContent = msg || '沒有資料';
+    }
+
+    function play(item){
+      // 直接使用原始 URL（不做 encode）
+      player.src = item.url;
+      player.play().catch(e => console.error('play() 失敗：', e));
+      now.textContent = `🎵 正在播放：${item.title || '(未命名)'}`;
+
+      // 若未提供時長，載入後顯示
+      player.onloadedmetadata = () => {
+        if(!item.duration && player.duration && isFinite(player.duration)){
+          const s = Math.round(player.duration);
+          const mm = String(Math.floor(s/60)).padStart(2,'0');
+          const ss = String(s%60).padStart(2,'0');
+          now.textContent = `🎵 正在播放：${item.title || '(未命名)'}（${mm}:${ss}）`;
+        }
+      };
+    }
+
+    // 監聽下拉
+    subjectSel.addEventListener('change', renderList);
+    volumeSel.addEventListener('change', renderList);
+  </script>
+</body>
+</html>
