@@ -32,6 +32,29 @@
       .controls{max-width:560px}
       .grid{grid-template-columns:repeat(2,1fr)}
     }
+
+    /* 通用下拉樣式 */
+    select.select {
+      appearance: none; /* 移除系統預設箭頭 */
+      -webkit-appearance: none;
+      -moz-appearance: none;
+
+      padding: 8px 30px 8px 10px; /* 預留右邊空間給箭頭 */
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: white;
+
+      background-image: url("data:image/svg+xml;utf8,<svg fill='%23333' height='12' viewBox='0 0 24 24' width='12' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      background-size: 12px 12px;
+    }
+
+    /* 為了兼容 Firefox，移除多餘邊框 */
+    select.select::-ms-expand {
+      display: none;
+    }
+
   </style>
 
   <meta property="og:type" content="website">
