@@ -14,7 +14,7 @@
     .bar{max-width:980px;margin:0 auto;padding:12px 16px;display:flex;gap:10px;align-items:center}
     .t{font-size:18px;font-weight:700;margin-right:auto}
     .controls{display:flex;gap:8px;flex:1}
-    .select{flex:1;min-width:0;appearance:none;background:#fff;color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+    .select{flex:1;min-width:0;appearance:none;background:#fff;color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px 36px 10px 12px;font-size:14px;position:relative}
     .wrap{max-width:980px;margin:0 auto;padding:14px 16px}
     .grid{display:grid;gap:10px}
     .card{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:12px}
@@ -32,39 +32,15 @@
       .controls{max-width:560px}
       .grid{grid-template-columns:repeat(2,1fr)}
     }
-
-    /* 通用下拉樣式 */
-    select.select {
-      appearance: none; /* 移除系統預設箭頭 */
-      -webkit-appearance: none;
-      -moz-appearance: none;
-
-      padding: 8px 30px 8px 10px; /* 預留右邊空間給箭頭 */
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background-color: white;
-
-      background-image: url("data:image/svg+xml;utf8,<svg fill='%23333' height='12' viewBox='0 0 24 24' width='12' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
-      background-repeat: no-repeat;
-      background-position: right 8px center;
-      background-size: 12px 12px;
+    /* 自訂下拉箭頭（右側小三角） */
+    select.select{
+      background-image:url("data:image/svg+xml;utf8,<svg fill='%23111' height='14' viewBox='0 0 24 24' width='14' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5'/></svg>");
+      background-repeat:no-repeat;
+      background-position:right 12px center;
+      background-size:14px 14px;
     }
-
-    /* 為了兼容 Firefox，移除多餘邊框 */
-    select.select::-ms-expand {
-      display: none;
-    }
-
+    select.select::-ms-expand{display:none}
   </style>
-
-  <meta property="og:type" content="website">
-<meta property="og:title" content="Podcast 播放｜自然科 第一冊">
-<meta property="og:description" content="線上收聽：生命的特性、養分、生物的運輸與防禦、協調作用、恆定性。">
-<meta property="og:url" content="https://markjim0321.github.io/podcast/">
-<meta property="og:image" content="https://your-domain.example/cover.jpg">  <!-- 換成一張 1200x630 圖 -->
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-
 </head>
 <body>
   <header>
@@ -83,7 +59,7 @@
 
   <main class="wrap">
     <div id="list" class="grid"></div>
-    <div id="empty" class="empty" style="display:none;">沒有資料</div>
+    <div id="empty" class="empty" style="display:none;">載入中…</div>
   </main>
 
   <footer class="player">
@@ -104,9 +80,9 @@
 
     let data = [];           // 全部清單
     let subjects = new Set();// 科目集合
-    let volumes  = new Set();// 冊次集合（從 URL 夾層 /audio/<科目>/<冊>/ 取）
+    let volumes  = new Set();// 冊次集合（從 URL 解析）
 
-    // 讀 podcasts.json
+    // 讀 podcasts.json（和 index.html 同層）
     fetch('./podcasts.json', { cache: 'no-store' })
       .then(r => r.json())
       .then(items => {
@@ -124,29 +100,58 @@
     function indexFilters(items){
       subjects.clear(); volumes.clear();
       for(const it of items){
-        if(it.subject) subjects.add(it.subject);
+        // 科目：若 json 沒給 subject，可嘗試從 URL 補抓
+        const subj = it.subject || extractSubject(it.url) || '';
+        it._subject = subj;
+        if(subj) subjects.add(subj);
+
         const vol = extractVolume(it.url);
-        if(vol) volumes.add(vol);
-        // 把解析到的冊次放在物件上，之後不用重算
         it._volume = vol || '';
+        if(vol) volumes.add(vol);
       }
     }
 
-    // 從 URL 抓冊次：.../audio/<subject>/<volume>/檔名
+    // 從 URL 解析「冊次」：在 "audio" 之後的幾個段落中找包含「冊」的字串
     function extractVolume(url){
       try{
         const u = new URL(url);
         const parts = decodeURI(u.pathname).split('/').filter(Boolean);
-        // pathname 例：/podcast_programe/audio/自然/第一冊/XXX.wav
-        // 找到 "audio" 的位置，volume 就是其後第 2 個
+        // 典型路徑：
+        // /shuim-w-knsh/audio/公民/第一冊/檔名.wav
+        // /shuim-w-knsh/audio/第二冊/檔名.wav
         const idx = parts.indexOf('audio');
-        if(idx >= 0 && parts.length > idx + 2) return parts[idx+2];
-      }catch(e){ /* ignore */ }
-      return '';
+        if (idx >= 0) {
+          const candidates = parts.slice(idx + 1, idx + 4); // audio 後 1~3 段
+          const vol = candidates.find(seg => /冊/.test(seg));
+          if (vol) return vol;
+        }
+        // 備援：從檔名抓（如「公民 第三冊 第1課.wav」）
+        const name = parts[parts.length - 1] || '';
+        const m = name.match(/([一二三四五六七八九十百0-9]+冊)/);
+        return m ? m[1] : '';
+      } catch { return ''; }
+    }
+
+    // 從 URL 解析「科目」（若 JSON 未提供）：取 audio 之後第一個且不含「冊」的段
+    function extractSubject(url){
+      try{
+        const u = new URL(url);
+        const parts = decodeURI(u.pathname).split('/').filter(Boolean);
+        const idx = parts.indexOf('audio');
+        if (idx >= 0) {
+          const a = parts[idx + 1] || '';
+          if (a && !/冊/.test(a) && !/\.[a-z0-9]+$/i.test(a)) return a; // 非檔名且不含「冊」
+        }
+        return '';
+      } catch { return ''; }
     }
 
     // 填入下拉選項
     function renderFilterOptions(){
+      // 清空舊選項（保留「全部」）
+      subjectSel.length = 1;
+      volumeSel.length = 1;
+
       // 科目
       for(const s of Array.from(subjects).sort()){
         const opt = document.createElement('option');
@@ -166,10 +171,9 @@
       const subj = subjectSel.value;
       const vol  = volumeSel.value;
 
-      // 篩選
       const rows = data.filter(it =>
-        (!subj || it.subject === subj) &&
-        (!vol  || it._volume === vol)
+        (!subj || it._subject === subj) &&
+        (!vol  || it._volume  === vol)
       );
 
       listEl.innerHTML = '';
@@ -177,7 +181,7 @@
 
       emptyEl.style.display = 'none';
 
-      // 依日期新到舊
+      // 依日期新到舊（若沒有 date 欄位則不影響順序）
       rows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
 
       for(const it of rows){
@@ -191,10 +195,10 @@
         const sub   = document.createElement('div');
         sub.className = 'sub';
         const parts = [];
-        if(it.subject) parts.push(it.subject);
-        if(it._volume) parts.push(it._volume);
-        if(it.date)    parts.push(it.date);
-        if(it.duration)parts.push(it.duration);
+        if(it._subject) parts.push(it._subject);
+        if(it._volume)  parts.push(it._volume);
+        if(it.date)     parts.push(it.date);
+        if(it.duration) parts.push(it.duration);
         sub.textContent = parts.join(' ｜ ');
 
         const row   = document.createElement('div');
@@ -221,7 +225,7 @@
     }
 
     function play(item){
-      // 直接使用原始 URL（不做 encode）
+      // 直接使用 JSON 裡的原始 URL（不再 encode）
       player.src = item.url;
       player.play().catch(e => console.error('play() 失敗：', e));
       now.textContent = `🎵 正在播放：${item.title || '(未命名)'}`;
@@ -237,7 +241,7 @@
       };
     }
 
-    // 監聽下拉
+    // 監聽下拉變更
     subjectSel.addEventListener('change', renderList);
     volumeSel.addEventListener('change', renderList);
   </script>
