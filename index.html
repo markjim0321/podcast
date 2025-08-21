@@ -6,7 +6,6 @@
   <title>Podcast 播放</title>
   <meta name="color-scheme" content="light">
   <style>
-    /* —— 基本樣式（白底行動優先） —— */
     :root{--fg:#111;--muted:#6b7280;--line:#e5e7eb;--card:#fff;--accent:#111}
     *{box-sizing:border-box}
     html,body{margin:0;background:#fff;color:var(--fg);font-family:system-ui,-apple-system,"Noto Sans TC",Segoe UI,Arial,sans-serif}
@@ -14,7 +13,7 @@
     .bar{max-width:980px;margin:0 auto;padding:12px 16px;display:flex;gap:10px;align-items:center}
     .t{font-size:18px;font-weight:700;margin-right:auto}
     .controls{display:flex;gap:8px;flex:1}
-    .select{flex:1;min-width:0;appearance:none;background:#fff;color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px 36px 10px 12px;font-size:14px;position:relative}
+    .select{flex:1;min-width:0;appearance:none;background:#fff;color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
     .wrap{max-width:980px;margin:0 auto;padding:14px 16px}
     .grid{display:grid;gap:10px}
     .card{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:12px}
@@ -27,19 +26,26 @@
     .player-inner{max-width:980px;margin:0 auto;padding:8px 16px}
     #now{font-size:14px;margin:4px 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     audio{width:100%}
-    /* 小螢幕優化 */
     @media (min-width:720px){
       .controls{max-width:560px}
       .grid{grid-template-columns:repeat(2,1fr)}
     }
-    /* 自訂下拉箭頭（右側小三角） */
-    select.select{
-      background-image:url("data:image/svg+xml;utf8,<svg fill='%23111' height='14' viewBox='0 0 24 24' width='14' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5'/></svg>");
-      background-repeat:no-repeat;
-      background-position:right 12px center;
-      background-size:14px 14px;
+
+    /* 下拉箭頭樣式 */
+    select.select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      padding: 8px 30px 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: white;
+      background-image: url("data:image/svg+xml;utf8,<svg fill='%23333' height='12' viewBox='0 0 24 24' width='12' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      background-size: 12px 12px;
     }
-    select.select::-ms-expand{display:none}
+    select.select::-ms-expand {display: none;}
   </style>
 </head>
 <body>
@@ -59,7 +65,7 @@
 
   <main class="wrap">
     <div id="list" class="grid"></div>
-    <div id="empty" class="empty" style="display:none;">載入中…</div>
+    <div id="empty" class="empty" style="display:none;">沒有資料</div>
   </main>
 
   <footer class="player">
@@ -70,7 +76,6 @@
   </footer>
 
   <script>
-    // 取元素
     const subjectSel = document.getElementById('subject');
     const volumeSel  = document.getElementById('volume');
     const listEl     = document.getElementById('list');
@@ -78,11 +83,14 @@
     const player     = document.getElementById('player');
     const now        = document.getElementById('now');
 
-    let data = [];           // 全部清單
-    let subjects = new Set();// 科目集合
-    let volumes  = new Set();// 冊次集合（從 URL 解析）
+    let data = [];
+    let subjects = new Set();
+    let volumes  = new Set();
 
-    // 讀 podcasts.json（和 index.html 同層）
+    // 冊次正則
+    const volumeRe = /^(?:第)?[一二三四五六七八九十百0-9]+冊$/;
+
+    // 載入 podcasts.json
     fetch('./podcasts.json', { cache: 'no-store' })
       .then(r => r.json())
       .then(items => {
@@ -96,121 +104,101 @@
         showEmpty('清單載入失敗');
       });
 
-    // 建立篩選（科目、冊次）
     function indexFilters(items){
       subjects.clear(); volumes.clear();
-      for(const it of items){
-        // 科目：若 json 沒給 subject，可嘗試從 URL 補抓
-        const subj = it.subject || extractSubject(it.url) || '';
-        it._subject = subj;
-        if(subj) subjects.add(subj);
+      for (const it of items){
+        if (it.subject) subjects.add(it.subject);
 
         const vol = extractVolume(it.url);
         it._volume = vol || '';
-        if(vol) volumes.add(vol);
+        if (vol && volumeRe.test(vol)) {
+          volumes.add(vol);
+        }
       }
     }
 
-    // 從 URL 解析「冊次」：在 "audio" 之後的幾個段落中找包含「冊」的字串
     function extractVolume(url){
       try{
         const u = new URL(url);
         const parts = decodeURI(u.pathname).split('/').filter(Boolean);
-        // 典型路徑：
-        // /shuim-w-knsh/audio/公民/第一冊/檔名.wav
-        // /shuim-w-knsh/audio/第二冊/檔名.wav
         const idx = parts.indexOf('audio');
-        if (idx >= 0) {
-          const candidates = parts.slice(idx + 1, idx + 4); // audio 後 1~3 段
-          const vol = candidates.find(seg => /冊/.test(seg));
-          if (vol) return vol;
+        if (idx >= 0){
+          const candidates = parts.slice(idx+1, idx+5)
+            .filter(seg => !/\.[a-z0-9]+$/i.test(seg));
+          const exact = candidates.find(seg => volumeRe.test(seg));
+          if (exact) return exact;
+          const looser = candidates.join(' ').match(/(?:第)?[一二三四五六七八九十百0-9]+冊/);
+          if (looser) return looser[0];
         }
-        // 備援：從檔名抓（如「公民 第三冊 第1課.wav」）
-        const name = parts[parts.length - 1] || '';
-        const m = name.match(/([一二三四五六七八九十百0-9]+冊)/);
-        return m ? m[1] : '';
-      } catch { return ''; }
+        const name = parts[parts.length-1] || '';
+        const m = decodeURI(name).match(/(?:第)?[一二三四五六七八九十百0-9]+冊/);
+        return m ? m[0] : '';
+      }catch{ return ''; }
     }
 
-    // 從 URL 解析「科目」（若 JSON 未提供）：取 audio 之後第一個且不含「冊」的段
-    function extractSubject(url){
-      try{
-        const u = new URL(url);
-        const parts = decodeURI(u.pathname).split('/').filter(Boolean);
-        const idx = parts.indexOf('audio');
-        if (idx >= 0) {
-          const a = parts[idx + 1] || '';
-          if (a && !/冊/.test(a) && !/\.[a-z0-9]+$/i.test(a)) return a; // 非檔名且不含「冊」
-        }
-        return '';
-      } catch { return ''; }
-    }
-
-    // 填入下拉選項
     function renderFilterOptions(){
-      // 清空舊選項（保留「全部」）
-      subjectSel.length = 1;
-      volumeSel.length = 1;
-
-      // 科目
       for(const s of Array.from(subjects).sort()){
         const opt = document.createElement('option');
         opt.value = s; opt.textContent = s;
         subjectSel.appendChild(opt);
       }
-      // 冊次
-      for(const v of Array.from(volumes).sort()){
-        const opt = document.createElement('option');
-        opt.value = opt.textContent = v;
-        volumeSel.appendChild(opt);
-      }
+              // 中文數字對照表
+        const chineseNums = { 一:1, 二:2, 三:3, 四:4, 五:5, 六:6, 七:7, 八:8, 九:9, 十:10 };
+
+        // 把「第一冊」轉數字
+        function parseVolume(v){
+          if(!v) return 0;
+          const m = v.match(/第([一二三四五六七八九十0-9]+)冊/);
+          if(!m) return 0;
+          const txt = m[1];
+
+          // 如果是阿拉伯數字
+          if(/^\d+$/.test(txt)) return parseInt(txt,10);
+
+          // 簡單處理 1-10
+          return chineseNums[txt] || 0;
+        }
+
+        // 冊次排序
+        for(const v of Array.from(volumes).sort((a,b)=>parseVolume(a)-parseVolume(b))){
+          const opt = document.createElement('option');
+          opt.value = opt.textContent = v;
+          volumeSel.appendChild(opt);
+        }
     }
 
-    // 篩選 + 渲染清單
     function renderList(){
       const subj = subjectSel.value;
       const vol  = volumeSel.value;
-
       const rows = data.filter(it =>
-        (!subj || it._subject === subj) &&
-        (!vol  || it._volume  === vol)
+        (!subj || it.subject === subj) &&
+        (!vol  || it._volume === vol)
       );
-
       listEl.innerHTML = '';
       if(!rows.length) return showEmpty('沒有符合條件的檔案');
-
       emptyEl.style.display = 'none';
-
-      // 依日期新到舊（若沒有 date 欄位則不影響順序）
       rows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
-
       for(const it of rows){
         const card  = document.createElement('div');
         card.className = 'card';
-
         const title = document.createElement('div');
         title.className = 'title';
         title.textContent = it.title || '(未命名)';
-
         const sub   = document.createElement('div');
         sub.className = 'sub';
         const parts = [];
-        if(it._subject) parts.push(it._subject);
-        if(it._volume)  parts.push(it._volume);
-        if(it.date)     parts.push(it.date);
-        if(it.duration) parts.push(it.duration);
+        if(it.subject) parts.push(it.subject);
+        if(it._volume) parts.push(it._volume);
+        if(it.date)    parts.push(it.date);
+        if(it.duration)parts.push(it.duration);
         sub.textContent = parts.join(' ｜ ');
-
         const row   = document.createElement('div');
         row.className = 'row';
-
         const btn   = document.createElement('button');
         btn.className = 'btn';
         btn.textContent = '播放';
         btn.onclick = () => play(it);
-
         row.appendChild(btn);
-
         card.appendChild(title);
         card.appendChild(sub);
         card.appendChild(row);
@@ -225,12 +213,9 @@
     }
 
     function play(item){
-      // 直接使用 JSON 裡的原始 URL（不再 encode）
       player.src = item.url;
       player.play().catch(e => console.error('play() 失敗：', e));
       now.textContent = `🎵 正在播放：${item.title || '(未命名)'}`;
-
-      // 若未提供時長，載入後顯示
       player.onloadedmetadata = () => {
         if(!item.duration && player.duration && isFinite(player.duration)){
           const s = Math.round(player.duration);
@@ -241,7 +226,6 @@
       };
     }
 
-    // 監聽下拉變更
     subjectSel.addEventListener('change', renderList);
     volumeSel.addEventListener('change', renderList);
   </script>
