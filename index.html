@@ -30,6 +30,9 @@
       .controls{max-width:560px}
       .grid{grid-template-columns:repeat(2,1fr)}
     }
+    /* 禁止選取、長按彈出、拖拉（行動裝置較有感） */
+    body { user-select: none; -webkit-user-select: none; }
+    audio, video, img { -webkit-touch-callout: none; }
 
     /* 下拉箭頭樣式 */
     select.select {
@@ -71,7 +74,12 @@
   <footer class="player">
     <div class="player-inner">
       <div id="now">尚未播放</div>
-      <audio id="player" controls preload="metadata"></audio>
+      <audio id="player"
+       controls
+       preload="metadata"
+       controlsList="nodownload noplaybackrate noremoteplayback"
+       oncontextmenu="return false">
+      </audio>
     </div>
   </footer>
 
@@ -87,36 +95,22 @@
     let subjects = new Set();
     let volumes  = new Set();
 
-    // 冊次正則
+    // 冊次正則（只接受「第一冊/第2冊/六冊」這種純冊次字樣）
     const volumeRe = /^(?:第)?[一二三四五六七八九十百0-9]+冊$/;
 
-    // 載入 podcasts.json
-    fetch('./podcasts.json', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(items => {
-        data = Array.isArray(items) ? items : [];
-        indexFilters(data);
-        renderFilterOptions();
-        renderList();
-      })
-      .catch(err => {
-        console.error('讀取 podcasts.json 失敗：', err);
-        showEmpty('清單載入失敗');
-      });
+    // 中文數字對照（冊次排序用）
+    const chineseNums = { 一:1, 二:2, 三:3, 四:4, 五:5, 六:6, 七:7, 八:8, 九:9, 十:10 };
 
-    function indexFilters(items){
-      subjects.clear(); volumes.clear();
-      for (const it of items){
-        if (it.subject) subjects.add(it.subject);
-
-        const vol = extractVolume(it.url);
-        it._volume = vol || '';
-        if (vol && volumeRe.test(vol)) {
-          volumes.add(vol);
-        }
-      }
+    function parseVolume(v){
+      if(!v) return 0;
+      const m = v.match(/第?([一二三四五六七八九十0-9]+)冊/);
+      if(!m) return 0;
+      const txt = m[1];
+      if(/^\d+$/.test(txt)) return parseInt(txt,10);
+      return chineseNums[txt] || 0;
     }
 
+    // 從 URL 解析冊次：在 "audio" 後 1~4 段內找含「冊」且不是檔名的段落
     function extractVolume(url){
       try{
         const u = new URL(url);
@@ -133,75 +127,88 @@
         const name = parts[parts.length-1] || '';
         const m = decodeURI(name).match(/(?:第)?[一二三四五六七八九十百0-9]+冊/);
         return m ? m[0] : '';
-      }catch{ return ''; }
+      }catch{
+        return '';
+      }
     }
 
+    // 建索引：蒐集科目與冊次
+    function indexFilters(items){
+      subjects.clear();
+      volumes.clear();
+      for (const it of items){
+        if (it.subject) subjects.add(it.subject);
+        const vol = extractVolume(it.url);
+        it._volume = vol || '';
+        if (vol && volumeRe.test(vol)) volumes.add(vol);
+      }
+    }
+
+    // 自訂科目顯示順序
+    const subjectOrder = ["國文", "英文", "數學", "自然", "公民", "地理", "歷史"];
+
+    // 產生下拉選項（科目 + 冊次）
     function renderFilterOptions(){
-      for(const s of Array.from(subjects).sort()){
+      // 清空（保留「全部」選項）
+      subjectSel.length = 1;
+      volumeSel.length  = 1;
+
+      // 科目依自訂順序輸出；未列在表內者排最後、用字典序
+      const sortedSubjects = Array.from(subjects).sort((a, b) => {
+        const ai = subjectOrder.indexOf(a);
+        const bi = subjectOrder.indexOf(b);
+        if (ai === -1 && bi === -1) return a.localeCompare(b, "zh-Hant");
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+      for(const s of sortedSubjects){
         const opt = document.createElement('option');
         opt.value = s; opt.textContent = s;
         subjectSel.appendChild(opt);
       }
-              // 中文數字對照表
-        const chineseNums = { 一:1, 二:2, 三:3, 四:4, 五:5, 六:6, 七:7, 八:8, 九:9, 十:10 };
 
-        // 把「第一冊」轉數字
-        function parseVolume(v){
-          if(!v) return 0;
-          const m = v.match(/第([一二三四五六七八九十0-9]+)冊/);
-          if(!m) return 0;
-          const txt = m[1];
-
-          // 如果是阿拉伯數字
-          if(/^\d+$/.test(txt)) return parseInt(txt,10);
-
-          // 簡單處理 1-10
-          return chineseNums[txt] || 0;
-        }
-
-        // 冊次排序
-        for(const v of Array.from(volumes).sort((a,b)=>parseVolume(a)-parseVolume(b))){
-          const opt = document.createElement('option');
-          opt.value = opt.textContent = v;
-          volumeSel.appendChild(opt);
-        }
+      // 冊次用數值排序（第一冊 → 第二冊 → …）
+      for(const v of Array.from(volumes).sort((a,b)=>parseVolume(a)-parseVolume(b))){
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = v;
+        volumeSel.appendChild(opt);
+      }
     }
 
+    // 渲染清單
     function renderList(){
       const subj = subjectSel.value;
       const vol  = volumeSel.value;
+
       const rows = data.filter(it =>
         (!subj || it.subject === subj) &&
         (!vol  || it._volume === vol)
       );
+
       listEl.innerHTML = '';
       if(!rows.length) return showEmpty('沒有符合條件的檔案');
       emptyEl.style.display = 'none';
+
       rows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+
       for(const it of rows){
-        const card  = document.createElement('div');
-        card.className = 'card';
-        const title = document.createElement('div');
-        title.className = 'title';
+        const card  = document.createElement('div'); card.className = 'card';
+        const title = document.createElement('div'); title.className = 'title';
         title.textContent = it.title || '(未命名)';
-        const sub   = document.createElement('div');
-        sub.className = 'sub';
+        const sub   = document.createElement('div'); sub.className = 'sub';
         const parts = [];
         if(it.subject) parts.push(it.subject);
         if(it._volume) parts.push(it._volume);
         if(it.date)    parts.push(it.date);
         if(it.duration)parts.push(it.duration);
         sub.textContent = parts.join(' ｜ ');
-        const row   = document.createElement('div');
-        row.className = 'row';
-        const btn   = document.createElement('button');
-        btn.className = 'btn';
+        const row   = document.createElement('div'); row.className = 'row';
+        const btn   = document.createElement('button'); btn.className = 'btn';
         btn.textContent = '播放';
         btn.onclick = () => play(it);
         row.appendChild(btn);
-        card.appendChild(title);
-        card.appendChild(sub);
-        card.appendChild(row);
+        card.appendChild(title); card.appendChild(sub); card.appendChild(row);
         listEl.appendChild(card);
       }
     }
@@ -218,7 +225,7 @@
       now.textContent = `🎵 正在播放：${item.title || '(未命名)'}`;
       player.onloadedmetadata = () => {
         if(!item.duration && player.duration && isFinite(player.duration)){
-          const s = Math.round(player.duration);
+          const s  = Math.round(player.duration);
           const mm = String(Math.floor(s/60)).padStart(2,'0');
           const ss = String(s%60).padStart(2,'0');
           now.textContent = `🎵 正在播放：${item.title || '(未命名)'}（${mm}:${ss}）`;
@@ -226,8 +233,37 @@
       };
     }
 
+    // 綁定事件
     subjectSel.addEventListener('change', renderList);
     volumeSel.addEventListener('change', renderList);
+
+    // 讀取 JSON（這段放在最後，確保上面函式皆已定義）
+    fetch('./podcasts.json', { cache: 'no-store' })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+        const text = await r.text();
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          console.error('JSON 解析失敗：', e);
+          console.log('前 200 字內容預覽：', text.slice(0, 200));
+          throw e;
+        }
+      })
+      .then(items => {
+        data = Array.isArray(items) ? items : [];
+        indexFilters(data);
+        renderFilterOptions();
+        renderList();
+      })
+      .catch(err => {
+        console.error('讀取 podcasts.json 失敗：', err);
+        showEmpty('清單載入失敗（詳見 Console）');
+      });
+    // 盡量避免用鍵盤另存
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'p')) e.preventDefault();
+      });
   </script>
 </body>
 </html>
