@@ -5,50 +5,68 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Podcast 播放</title>
   <meta name="color-scheme" content="light">
+  <link rel="preconnect" href="https://storage.googleapis.com" crossorigin>
+
   <style>
-    :root{--fg:#111;--muted:#6b7280;--line:#e5e7eb;--card:#fff;--accent:#111}
+    :root{
+      --fg:#0f172a; --muted:#64748b; --line:#e2e8f0; --card:#ffffff; --bg:#f8fafc;
+      --accent:#0f766e; --accent-press:#0b5f59; --badge-bg:#eef2ff;
+      --shadow:0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.06);
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --fg:#e5e7eb; --muted:#94a3b8; --line:#334155; --card:#0b1220; --bg:#050816;
+        --badge-bg:#0b1220; --shadow:none; --accent:#22c55e; --accent-press:#16a34a;
+      }
+    }
     *{box-sizing:border-box}
-    html,body{margin:0;background:#fff;color:var(--fg);font-family:system-ui,-apple-system,"Noto Sans TC",Segoe UI,Arial,sans-serif}
-    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line)}
+    html,body{margin:0;background:var(--bg);color:var(--fg);
+      font-family:system-ui,-apple-system,"Noto Sans TC",Segoe UI,Arial,sans-serif}
+    header{position:sticky;top:0;z-index:10;background:var(--card);
+      border-bottom:1px solid var(--line);backdrop-filter:saturate(1.2) blur(6px)}
     .bar{max-width:980px;margin:0 auto;padding:12px 16px;display:flex;gap:10px;align-items:center}
-    .t{font-size:18px;font-weight:700;margin-right:auto}
+    .t{font-size:18px;font-weight:800;letter-spacing:.3px;margin-right:auto}
     .controls{display:flex;gap:8px;flex:1}
-    .select{flex:1;min-width:0;appearance:none;background:#fff;color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
-    .wrap{max-width:980px;margin:0 auto;padding:14px 16px}
-    .grid{display:grid;gap:10px}
-    .card{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:12px}
-    .title{font-weight:700;line-height:1.35}
-    .sub{margin-top:4px;font-size:12px;color:var(--muted)}
-    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
-    .btn{border:0;border-radius:10px;background:var(--accent);color:#fff;padding:10px 14px;font-size:14px}
+    .select{flex:1;min-width:0;appearance:none;background:#fff;color:var(--fg);
+      border:1px solid var(--line);border-radius:12px;padding:12px 40px 12px 12px;font-size:15px}
+    select.select{
+      background-image:url("data:image/svg+xml;utf8,<svg fill='%23111' height='14' viewBox='0 0 24 24' width='14' xmlns='http://www.w3.org/2000/svg'><path d=\"M7 10l5 5 5-5\"/></svg>");
+      background-repeat:no-repeat;background-position:right 12px center;background-size:14px 14px
+    }
+    select.select::-ms-expand{display:none}
+
+    .wrap{max-width:980px;margin:0 auto;padding:16px}
+    .grid{display:grid;gap:12px}
+    @media (min-width:720px){ .controls{max-width:560px} .grid{grid-template-columns:repeat(2,1fr)} }
+
+    .card{border:1px solid var(--line);border-radius:16px;background:var(--card);
+      padding:14px;box-shadow:var(--shadow);transition:transform .08s ease}
+    .card:active{transform:scale(.996)}
+
+    .title{font-weight:800;line-height:1.35;font-size:16px}
+    .sub{margin-top:6px;font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .badge{display:inline-flex;align-items:center;gap:6px;
+      background:var(--badge-bg);border:1px solid var(--line);
+      font-size:11px;padding:4px 8px;border-radius:999px;font-weight:700}
+
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+    .btn{border:0;border-radius:12px;background:var(--accent);color:#fff;
+      padding:12px 16px;font-size:14px;font-weight:700;letter-spacing:.3px}
+    .btn:active{background:var(--accent-press)}
+
     .empty{color:var(--muted);text-align:center;padding:28px 0}
-    footer.player{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line)}
-    .player-inner{max-width:980px;margin:0 auto;padding:8px 16px}
+
+    footer.player{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line)}
+    .player-inner{max-width:980px;margin:0 auto;padding:10px 16px}
     #now{font-size:14px;margin:4px 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     audio{width:100%}
-    @media (min-width:720px){
-      .controls{max-width:560px}
-      .grid{grid-template-columns:repeat(2,1fr)}
-    }
-    /* 禁止選取、長按彈出、拖拉（行動裝置較有感） */
-    body { user-select: none; -webkit-user-select: none; }
-    audio, video, img { -webkit-touch-callout: none; }
 
-    /* 下拉箭頭樣式 */
-    select.select {
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      padding: 8px 30px 8px 10px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background-color: white;
-      background-image: url("data:image/svg+xml;utf8,<svg fill='%23333' height='12' viewBox='0 0 24 24' width='12' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
-      background-repeat: no-repeat;
-      background-position: right 8px center;
-      background-size: 12px 12px;
-    }
-    select.select::-ms-expand {display: none;}
+    /* skeleton */
+    .skel{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:14px}
+    .sbar{height:14px;background:linear-gradient(90deg,#e5e7eb,#f3f4f6,#e5e7eb);
+      background-size:200% 100%;animation:shimmer 1.4s infinite; border-radius:8px}
+    .sbar+.sbar{margin-top:10px;height:10px;width:60%}
+    @keyframes shimmer{0%{background-position:0 0}100%{background-position:-200% 0}}
   </style>
 </head>
 <body>
@@ -74,12 +92,7 @@
   <footer class="player">
     <div class="player-inner">
       <div id="now">尚未播放</div>
-      <audio id="player"
-       controls
-       preload="metadata"
-       controlsList="nodownload noplaybackrate noremoteplayback"
-       oncontextmenu="return false">
-      </audio>
+      <audio id="player" controls preload="metadata"></audio>
     </div>
   </footer>
 
@@ -95,12 +108,19 @@
     let subjects = new Set();
     let volumes  = new Set();
 
-    // 冊次正則（只接受「第一冊/第2冊/六冊」這種純冊次字樣）
+    const subjectOrder = ["國文","英文","數學","自然","公民","地理","歷史"];
+    const subjectColor = {
+      "國文":"#dc2626",
+      "英文":"#1d4ed8",
+      "數學":"#7c3aed",
+      "自然":"#0f766e",
+      "公民":"#2563eb",
+      "地理":"#0ea5e9",
+      "歷史":"#b45309"
+    };
+
     const volumeRe = /^(?:第)?[一二三四五六七八九十百0-9]+冊$/;
-
-    // 中文數字對照（冊次排序用）
     const chineseNums = { 一:1, 二:2, 三:3, 四:4, 五:5, 六:6, 七:7, 八:8, 九:9, 十:10 };
-
     function parseVolume(v){
       if(!v) return 0;
       const m = v.match(/第?([一二三四五六七八九十0-9]+)冊/);
@@ -109,8 +129,6 @@
       if(/^\d+$/.test(txt)) return parseInt(txt,10);
       return chineseNums[txt] || 0;
     }
-
-    // 從 URL 解析冊次：在 "audio" 後 1~4 段內找含「冊」且不是檔名的段落
     function extractVolume(url){
       try{
         const u = new URL(url);
@@ -127,15 +145,21 @@
         const name = parts[parts.length-1] || '';
         const m = decodeURI(name).match(/(?:第)?[一二三四五六七八九十百0-9]+冊/);
         return m ? m[0] : '';
-      }catch{
-        return '';
+      }catch{ return ''; }
+    }
+
+    function showSkeleton(){
+      listEl.innerHTML = '';
+      for(let i=0;i<4;i++){
+        const c = document.createElement('div');
+        c.className = 'skel';
+        c.innerHTML = '<div class="sbar" style="width:80%"></div><div class="sbar"></div>';
+        listEl.appendChild(c);
       }
     }
 
-    // 建索引：蒐集科目與冊次
     function indexFilters(items){
-      subjects.clear();
-      volumes.clear();
+      subjects.clear(); volumes.clear();
       for (const it of items){
         if (it.subject) subjects.add(it.subject);
         const vol = extractVolume(it.url);
@@ -144,16 +168,9 @@
       }
     }
 
-    // 自訂科目顯示順序
-    const subjectOrder = ["國文", "英文", "數學", "自然", "公民", "地理", "歷史"];
-
-    // 產生下拉選項（科目 + 冊次）
     function renderFilterOptions(){
-      // 清空（保留「全部」選項）
-      subjectSel.length = 1;
-      volumeSel.length  = 1;
-
-      // 科目依自訂順序輸出；未列在表內者排最後、用字典序
+      subjectSel.length = 1; 
+      volumeSel.length  = 1; 
       const sortedSubjects = Array.from(subjects).sort((a, b) => {
         const ai = subjectOrder.indexOf(a);
         const bi = subjectOrder.indexOf(b);
@@ -167,8 +184,6 @@
         opt.value = s; opt.textContent = s;
         subjectSel.appendChild(opt);
       }
-
-      // 冊次用數值排序（第一冊 → 第二冊 → …）
       for(const v of Array.from(volumes).sort((a,b)=>parseVolume(a)-parseVolume(b))){
         const opt = document.createElement('option');
         opt.value = opt.textContent = v;
@@ -176,39 +191,47 @@
       }
     }
 
-    // 渲染清單
     function renderList(){
       const subj = subjectSel.value;
       const vol  = volumeSel.value;
-
       const rows = data.filter(it =>
         (!subj || it.subject === subj) &&
         (!vol  || it._volume === vol)
       );
-
       listEl.innerHTML = '';
       if(!rows.length) return showEmpty('沒有符合條件的檔案');
       emptyEl.style.display = 'none';
-
       rows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
-
       for(const it of rows){
         const card  = document.createElement('div'); card.className = 'card';
         const title = document.createElement('div'); title.className = 'title';
         title.textContent = it.title || '(未命名)';
         const sub   = document.createElement('div'); sub.className = 'sub';
-        const parts = [];
-        if(it.subject) parts.push(it.subject);
-        if(it._volume) parts.push(it._volume);
-        if(it.date)    parts.push(it.date);
-        if(it.duration)parts.push(it.duration);
-        sub.textContent = parts.join(' ｜ ');
+        if (it.subject){
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = it.subject;
+          const c = subjectColor[it.subject];
+          if (c){ badge.style.color=c; badge.style.borderColor=c+"20"; }
+          sub.appendChild(badge);
+        }
+        const meta = [];
+        if(it._volume)  meta.push(it._volume);
+        if(it.date)     meta.push(it.date);
+        if(it.duration) meta.push(it.duration);
+        if (meta.length){
+          const span = document.createElement('span');
+          span.textContent = meta.join(' ｜ ');
+          sub.appendChild(span);
+        }
         const row   = document.createElement('div'); row.className = 'row';
         const btn   = document.createElement('button'); btn.className = 'btn';
         btn.textContent = '播放';
         btn.onclick = () => play(it);
         row.appendChild(btn);
-        card.appendChild(title); card.appendChild(sub); card.appendChild(row);
+        card.appendChild(title);
+        card.appendChild(sub);
+        card.appendChild(row);
         listEl.appendChild(card);
       }
     }
@@ -233,23 +256,12 @@
       };
     }
 
-    // 綁定事件
     subjectSel.addEventListener('change', renderList);
     volumeSel.addEventListener('change', renderList);
 
-    // 讀取 JSON（這段放在最後，確保上面函式皆已定義）
+    showSkeleton();
     fetch('./podcasts.json', { cache: 'no-store' })
-      .then(async (r) => {
-        if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
-        const text = await r.text();
-        try {
-          return JSON.parse(text);
-        } catch (e) {
-          console.error('JSON 解析失敗：', e);
-          console.log('前 200 字內容預覽：', text.slice(0, 200));
-          throw e;
-        }
-      })
+      .then(r => r.json())
       .then(items => {
         data = Array.isArray(items) ? items : [];
         indexFilters(data);
@@ -258,11 +270,7 @@
       })
       .catch(err => {
         console.error('讀取 podcasts.json 失敗：', err);
-        showEmpty('清單載入失敗（詳見 Console）');
-      });
-    // 盡量避免用鍵盤另存
-    document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'p')) e.preventDefault();
+        showEmpty('清單載入失敗');
       });
   </script>
 </body>
