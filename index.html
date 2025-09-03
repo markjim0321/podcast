@@ -4,76 +4,130 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Podcast 播放</title>
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="light" />
   <link rel="preconnect" href="https://storage.googleapis.com" crossorigin>
 
   <style>
+    /* ===== 1) 全站主題（吸睛漸層 + 網格） ===== */
     :root{
-      --fg:#0f172a; --muted:#64748b; --line:#e2e8f0; --card:#ffffff; --bg:#f8fafc;
-      --accent:#0f766e; --accent-press:#0b5f59; --badge-bg:#eef2ff;
-      --shadow:0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.06);
+      --fg:#0f172a; --muted:#64748b; --line:rgba(15,23,42,.15);
+      --card:rgba(255,255,255,.72); --bg:#f8fafc;
+      --accent:#18a07a; --accent-press:#0f8364;
+      --shadow:0 8px 30px rgba(15,23,42,.12);
     }
-    /*
-    @media (prefers-color-scheme: dark){
-      :root{
-        --fg:#e5e7eb; --muted:#94a3b8; --line:#334155; --card:#0b1220; --bg:#050816;
-        --badge-bg:#0b1220; --shadow:none; --accent:#22c55e; --accent-press:#16a34a;
-      }
-    }
-    */
     *{box-sizing:border-box}
-    html,body{margin:0;background:var(--bg);color:var(--fg);
+    html,body{margin:0;color:var(--fg);
       font-family:system-ui,-apple-system,"Noto Sans TC",Segoe UI,Arial,sans-serif}
-    header{position:sticky;top:0;z-index:10;background:var(--card);
-      border-bottom:1px solid var(--line);backdrop-filter:saturate(1.2) blur(6px)}
-    .bar{max-width:980px;margin:0 auto;padding:12px 16px;display:flex;gap:10px;align-items:center}
-    .t{font-size:18px;font-weight:800;letter-spacing:.3px;margin-right:auto}
-    .controls{display:flex;gap:8px;flex:1}
-    .select{flex:1;min-width:0;appearance:none;background:#fff;color:var(--fg);
-      border:1px solid var(--line);border-radius:12px;padding:12px 40px 12px 12px;font-size:15px}
-    select.select{
-      background-image:url("data:image/svg+xml;utf8,<svg fill='%23111' height='14' viewBox='0 0 24 24' width='14' xmlns='http://www.w3.org/2000/svg'><path d=\"M7 10l5 5 5-5\"/></svg>");
-      background-repeat:no-repeat;background-position:right 12px center;background-size:14px 14px
-    }
-    select.select::-ms-expand{display:none}
 
+    /* 背景：柔和漸層 + 細格線 */
+    body{
+      min-height:100dvh;
+      background:
+        radial-gradient(40rem 40rem at -20% -20%, #a7f3d0 0%, transparent 40%),
+        radial-gradient(45rem 45rem at 120% 0%, #bfdbfe 0%, transparent 45%),
+        radial-gradient(45rem 45rem at 100% 120%, #fde68a 0%, transparent 40%),
+        linear-gradient(180deg,#f8fafc 0%, #eef2ff 100%);
+      position:relative;
+      overflow-x:hidden;
+    }
+    /* 淡淡的網格 */
+    body::before{
+      content:""; position:fixed; inset:0; z-index:-1;
+      background-image:
+        linear-gradient(rgba(15,23,42,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15,23,42,.06) 1px, transparent 1px);
+      background-size:28px 28px; pointer-events:none;
+      mask-image: radial-gradient(ellipse at 50% 30%, rgba(0,0,0,.26), transparent 70%);
+    }
+
+    /* ===== 2) Header 與篩選 ===== */
+    header{position:sticky;top:0;z-index:10;
+      backdrop-filter:saturate(1.2) blur(8px);
+      background:rgba(255,255,255,.65);
+      border-bottom:1px solid rgba(15,23,42,.08)}
+    .bar{max-width:980px;margin:0 auto;padding:12px 16px;display:flex;gap:10px;align-items:center}
+    .t{font-size:20px;font-weight:800;letter-spacing:.2px;margin-right:auto}
+
+    .controls{display:flex;gap:10px;flex:1}
+    .select{
+      flex:1;min-width:0;
+      appearance:none;-webkit-appearance:none;-moz-appearance:none;
+      background:#fff;color:#0f172a;border:1.5px solid #94a3b8;
+      border-radius:14px;padding:12px 44px 12px 12px;font-size:16px;line-height:1.2;
+      background-image:url("data:image/svg+xml;utf8,<svg fill='%23112233' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5'/></svg>");
+      background-repeat:no-repeat;background-position:right 12px center;background-size:16px 16px;
+      box-shadow:inset 0 1px 2px rgba(0,0,0,.04)
+    }
+    .select:focus{outline:3px solid rgba(37,99,235,.22);border-color:#2563eb}
+    .select::-ms-expand{display:none}
+    /* 強制下拉面板用淺色 */
+    html, body, select, option, optgroup, input, button { color-scheme: light; }
+    select.select option, select.select optgroup{ background:#fff; color:#0f172a; }
+
+    /* ===== 3) 內容區與卡片（玻璃擬態） ===== */
     .wrap{max-width:980px;margin:0 auto;padding:16px}
-    .grid{display:grid;gap:12px}
+    .grid{display:grid;gap:14px}
     @media (min-width:720px){ .controls{max-width:560px} .grid{grid-template-columns:repeat(2,1fr)} }
 
-    .card{border:1px solid var(--line);border-radius:16px;background:var(--card);
-      padding:14px;box-shadow:var(--shadow);transition:transform .08s ease}
-    .card:active{transform:scale(.996)}
+    .card{
+      position:relative;
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:var(--card);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      padding:14px; box-shadow:var(--shadow);
+      transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .card:hover{ transform:translateY(-2px); box-shadow:0 10px 36px rgba(15,23,42,.16) }
+    .card.playing{ border-color:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.18), var(--shadow) }
 
     .title{font-weight:800;line-height:1.35;font-size:16px}
     .sub{margin-top:6px;font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .badge{display:inline-flex;align-items:center;gap:6px;
-      background:var(--badge-bg);border:1px solid var(--line);
-      font-size:11px;padding:4px 8px;border-radius:999px;font-weight:700}
 
+    /* 科目徽章（保留彩色） */
+    .badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.6);
+      border:1px solid rgba(15,23,42,.12);font-size:11px;padding:4px 8px;border-radius:999px;font-weight:700}
+
+    /* ===== 4) 播放按鈕：圓形漸層 + 呼吸光暈 ===== */
     .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
-    .btn{border:0;border-radius:12px;background:var(--accent);color:#fff;
-      padding:12px 16px;font-size:14px;font-weight:700;letter-spacing:.3px}
-    .btn:active{background:var(--accent-press)}
+    .btn{
+      --g1:#34d399; --g2:#10b981;
+      border:0; border-radius:999px; color:#fff; font-size:14px; font-weight:800; letter-spacing:.3px;
+      padding:14px 22px; min-width:90px;
+      background:linear-gradient(135deg,var(--g1),var(--g2));
+      box-shadow:0 10px 20px rgba(16,185,129,.24), inset 0 0 0 1px rgba(255,255,255,.25);
+      position:relative; overflow:hidden;
+    }
+    .btn:active{ filter:brightness(.95) }
+    /* 呼吸光暈：播放時才會啟用 */
+    .btn.pulse::after{
+      content:""; position:absolute; inset:-6px; border-radius:999px;
+      background:radial-gradient(circle at 50% 50%, rgba(16,185,129,.35), transparent 60%);
+      animation:pulse 1.8s ease-in-out infinite;
+      pointer-events:none;
+    }
+    @keyframes pulse{
+      0%{ transform:scale(.9); opacity:.65 }
+      70%{ transform:scale(1.05); opacity:.15 }
+      100%{ transform:scale(.9); opacity:.0 }
+    }
 
     .empty{color:var(--muted);text-align:center;padding:28px 0}
 
-    footer.player{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line)}
+    /* 底部播放器 */
+    footer.player{position:sticky;bottom:0;background:rgba(255,255,255,.75);
+      backdrop-filter:blur(8px); border-top:1px solid rgba(15,23,42,.08)}
     .player-inner{max-width:980px;margin:0 auto;padding:10px 16px}
     #now{font-size:14px;margin:4px 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     audio{width:100%}
 
-    /* skeleton */
-    .skel{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:14px}
+    /* 骨架 */
+    .skel{border:1px solid var(--line);border-radius:18px;background:var(--card);backdrop-filter:blur(8px);padding:14px;box-shadow:var(--shadow)}
     .sbar{height:14px;background:linear-gradient(90deg,#e5e7eb,#f3f4f6,#e5e7eb);
       background-size:200% 100%;animation:shimmer 1.4s infinite; border-radius:8px}
     .sbar+.sbar{margin-top:10px;height:10px;width:60%}
     @keyframes shimmer{0%{background-position:0 0}100%{background-position:-200% 0}}
-    
-    html, body, select, option, optgroup, input, button {
-    color-scheme: light;
-    }
-
   </style>
 </head>
 <body>
@@ -104,6 +158,7 @@
   </footer>
 
   <script>
+    // ===== 元件 =====
     const subjectSel = document.getElementById('subject');
     const volumeSel  = document.getElementById('volume');
     const listEl     = document.getElementById('list');
@@ -111,21 +166,20 @@
     const player     = document.getElementById('player');
     const now        = document.getElementById('now');
 
+    // ===== 狀態 =====
     let data = [];
     let subjects = new Set();
     let volumes  = new Set();
+    let currentUrl = ""; // 目前播放中的 URL（用來標記卡片）
 
+    // 科目順序與顏色
     const subjectOrder = ["國文","英文","數學","自然","公民","地理","歷史"];
     const subjectColor = {
-      "國文":"#dc2626",
-      "英文":"#1d4ed8",
-      "數學":"#7c3aed",
-      "自然":"#0f766e",
-      "公民":"#2563eb",
-      "地理":"#0ea5e9",
-      "歷史":"#b45309"
+      "國文":"#dc2626","英文":"#1d4ed8","數學":"#7c3aed",
+      "自然":"#0f766e","公民":"#2563eb","地理":"#0ea5e9","歷史":"#b45309"
     };
 
+    // 冊次判斷/排序
     const volumeRe = /^(?:第)?[一二三四五六七八九十百0-9]+冊$/;
     const chineseNums = { 一:1, 二:2, 三:3, 四:4, 五:5, 六:6, 七:7, 八:8, 九:9, 十:10 };
     function parseVolume(v){
@@ -155,6 +209,7 @@
       }catch{ return ''; }
     }
 
+    // Skeleton
     function showSkeleton(){
       listEl.innerHTML = '';
       for(let i=0;i<4;i++){
@@ -165,6 +220,7 @@
       }
     }
 
+    // 建索引
     function indexFilters(items){
       subjects.clear(); volumes.clear();
       for (const it of items){
@@ -175,51 +231,59 @@
       }
     }
 
+    // 下拉選項
     function renderFilterOptions(){
-      subjectSel.length = 1; 
-      volumeSel.length  = 1; 
-      const sortedSubjects = Array.from(subjects).sort((a, b) => {
-        const ai = subjectOrder.indexOf(a);
-        const bi = subjectOrder.indexOf(b);
+      subjectSel.length = 1; volumeSel.length = 1;
+      const sortedSubjects = Array.from(subjects).sort((a,b)=>{
+        const ai = subjectOrder.indexOf(a), bi = subjectOrder.indexOf(b);
         if (ai === -1 && bi === -1) return a.localeCompare(b, "zh-Hant");
-        if (ai === -1) return 1;
-        if (bi === -1) return -1;
+        if (ai === -1) return 1; if (bi === -1) return -1;
         return ai - bi;
       });
       for(const s of sortedSubjects){
-        const opt = document.createElement('option');
-        opt.value = s; opt.textContent = s;
+        const opt = document.createElement('option'); opt.value=s; opt.textContent=s;
         subjectSel.appendChild(opt);
       }
       for(const v of Array.from(volumes).sort((a,b)=>parseVolume(a)-parseVolume(b))){
-        const opt = document.createElement('option');
-        opt.value = opt.textContent = v;
+        const opt = document.createElement('option'); opt.value=v; opt.textContent=v;
         volumeSel.appendChild(opt);
       }
     }
 
+    // 渲染清單
     function renderList(){
       const subj = subjectSel.value;
       const vol  = volumeSel.value;
+
       const rows = data.filter(it =>
         (!subj || it.subject === subj) &&
         (!vol  || it._volume === vol)
       );
+
       listEl.innerHTML = '';
       if(!rows.length) return showEmpty('沒有符合條件的檔案');
       emptyEl.style.display = 'none';
+
       rows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+
       for(const it of rows){
-        const card  = document.createElement('div'); card.className = 'card';
-        const title = document.createElement('div'); title.className = 'title';
+        const card  = document.createElement('div');
+        card.className = 'card';
+        card.dataset.url = it.url;
+        if (currentUrl && currentUrl === it.url) card.classList.add('playing');
+
+        const title = document.createElement('div');
+        title.className = 'title';
         title.textContent = it.title || '(未命名)';
-        const sub   = document.createElement('div'); sub.className = 'sub';
+
+        const sub   = document.createElement('div');
+        sub.className = 'sub';
         if (it.subject){
           const badge = document.createElement('span');
           badge.className = 'badge';
           badge.textContent = it.subject;
           const c = subjectColor[it.subject];
-          if (c){ badge.style.color=c; badge.style.borderColor=c+"20"; }
+          if (c){ badge.style.color=c; badge.style.borderColor=c+"33"; }
           sub.appendChild(badge);
         }
         const meta = [];
@@ -231,10 +295,13 @@
           span.textContent = meta.join(' ｜ ');
           sub.appendChild(span);
         }
+
         const row   = document.createElement('div'); row.className = 'row';
         const btn   = document.createElement('button'); btn.className = 'btn';
         btn.textContent = '播放';
+        if (currentUrl && currentUrl === it.url) btn.classList.add('pulse');
         btn.onclick = () => play(it);
+
         row.appendChild(btn);
         card.appendChild(title);
         card.appendChild(sub);
@@ -249,10 +316,30 @@
       emptyEl.textContent = msg || '沒有資料';
     }
 
+    // 播放 + 視覺高亮
     function play(item){
+      // 解除前一次標記
+      if (currentUrl){
+        const prev = listEl.querySelector(`.card[data-url="${CSS.escape(currentUrl)}"]`);
+        if (prev){
+          prev.classList.remove('playing');
+          const pb = prev.querySelector('.btn'); pb && pb.classList.remove('pulse');
+        }
+      }
+      currentUrl = item.url;
+
+      // 新標記
+      const cur = listEl.querySelector(`.card[data-url="${CSS.escape(currentUrl)}"]`);
+      if (cur){
+        cur.classList.add('playing');
+        const pb = cur.querySelector('.btn'); pb && pb.classList.add('pulse');
+        cur.scrollIntoView({behavior:'smooth', block:'center'});
+      }
+
       player.src = item.url;
       player.play().catch(e => console.error('play() 失敗：', e));
       now.textContent = `🎵 正在播放：${item.title || '(未命名)'}`;
+
       player.onloadedmetadata = () => {
         if(!item.duration && player.duration && isFinite(player.duration)){
           const s  = Math.round(player.duration);
@@ -266,6 +353,7 @@
     subjectSel.addEventListener('change', renderList);
     volumeSel.addEventListener('change', renderList);
 
+    // 啟動流程
     showSkeleton();
     fetch('./podcasts.json', { cache: 'no-store' })
       .then(r => r.json())
