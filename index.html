@@ -12,7 +12,7 @@
     :root{
       --fg:#0f172a; --muted:#64748b; --line:rgba(15,23,42,.15);
       --card:rgba(255,255,255,.72); --bg:#f8fafc;
-      --accent:#18a07a; --accent-press:#0f8364;
+      --accent:#0b0008; --accent-press:#0f8364;
       --shadow:0 8px 30px rgba(15,23,42,.12);
     }
     *{box-sizing:border-box}
@@ -90,7 +90,7 @@
       border:1px solid rgba(15,23,42,.12);font-size:11px;padding:4px 8px;border-radius:999px;font-weight:700}
 
     /* ===== 4) 播放按鈕：圓形漸層 + 呼吸光暈 ===== */
-    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;margin-left:auto;}
     .btn{
       --g1:#34d399; --g2:#10b981;
       border:0; border-radius:999px; color:#fff; font-size:14px; font-weight:800; letter-spacing:.3px;
@@ -129,6 +129,39 @@
     .sbar+.sbar{margin-top:10px;height:10px;width:60%}
     @keyframes shimmer{0%{background-position:0 0}100%{background-position:-200% 0}}
   </style>
+
+  <style>
+  /* 動態縮圖：讓卡片變成「縮圖 + 內容」的雙欄排版 */
+  .card.has-thumb{
+    display:grid;
+    grid-template-columns:72px 1fr;
+    gap:12px;
+    align-items:center;
+  }
+  .card.has-thumb .title{ margin-top:0 }
+  .card.has-thumb .row{ margin-top:10px }
+
+  /* 產生的縮圖方塊 */
+  .thumb{
+    width:72px;height:72px;border-radius:14px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:900;font-size:18px;letter-spacing:.1em;
+    box-shadow:0 10px 24px rgba(15,23,42,.18), inset 0 0 0 1px rgba(255,255,255,.18);
+    border:1px solid rgba(15,23,42,.08);
+    user-select:none;
+  }
+  /* 縮圖外框強化：播放中有光暈 */
+  .card.playing .thumb{
+    box-shadow:0 0 0 3px rgba(34,197,94,.22), 0 10px 24px rgba(15,23,42,.18);
+  }
+
+  /* 小螢幕再緊一點 */
+  @media (max-width:480px){
+    .card.has-thumb{ grid-template-columns:64px 1fr }
+    .thumb{ width:64px; height:64px; font-size:16px }
+  }
+</style>
+
 </head>
 <body>
   <header>
@@ -368,5 +401,63 @@
         showEmpty('清單載入失敗');
       });
   </script>
+
+  <script>
+  // === 動態縮圖增強 ===
+  (function(){
+    const listEl = document.getElementById('list');
+
+    // 依科目顏色產生簡單漸層（如果沒有就用預設綠）
+    function makeGradientColor(hex){
+      const base = (hex && /^#([0-9a-f]{6})$/i.test(hex)) ? hex : '#10b981';
+      // 用同色系做兩段漸層，第二段降低亮度一點
+      return `linear-gradient(135deg, ${base} 0%, ${shade(base, -16)} 100%)`;
+    }
+    // 簡易調亮/調暗 hex 顏色 (amt: 負值變暗、正值變亮)
+    function shade(hex, amt){
+      const n = hex.replace('#','');
+      const r = Math.max(0, Math.min(255, parseInt(n.slice(0,2),16) + amt));
+      const g = Math.max(0, Math.min(255, parseInt(n.slice(2,4),16) + amt));
+      const b = Math.max(0, Math.min(255, parseInt(n.slice(4,6),16) + amt));
+      return '#' + [r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+    }
+
+    function enhanceCards(){
+      const cards = listEl.querySelectorAll('.card');
+      cards.forEach(card=>{
+        if(card.classList.contains('has-thumb')) return; // 已處理過
+        // 從卡片內的科目徽章讀科目文字
+        const badge = card.querySelector('.badge');
+        const subjectText = badge ? (badge.textContent || '').trim() : '';
+        const label = subjectText ? subjectText[0] : 'P'; // 沒有就顯示 P
+
+        // 取用你原程式裡的 subjectColor（若無則給預設）
+        const hex = (window.subjectColor && subjectColor[subjectText]) || '#10b981';
+
+        // 建立縮圖節點並插入到卡片第一個位置
+        const thumb = document.createElement('div');
+        thumb.className = 'thumb';
+        thumb.setAttribute('aria-hidden', 'true');
+        thumb.style.backgroundImage = makeGradientColor(hex);
+        thumb.textContent = label;
+
+        card.insertBefore(thumb, card.firstChild);
+        card.classList.add('has-thumb');
+      });
+    }
+
+    // 初次執行
+    enhanceCards();
+
+    // 監看清單變動（例如切換科目/冊次重新渲染）
+    const mo = new MutationObserver(()=>enhanceCards());
+    mo.observe(listEl, { childList:true });
+
+    // 若你的程式在 renderList() 之後還有非同步更新，保險再跑一次
+    window.addEventListener('load', ()=> setTimeout(enhanceCards, 0));
+  })();
+</script>
+
+
 </body>
 </html>
