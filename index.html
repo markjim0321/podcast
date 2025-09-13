@@ -458,6 +458,28 @@
   })();
 </script>
 
+<script>
+/* 將標題在「第X課」之後強制換行（支援中文數字與阿拉伯數字） */
+(function () {
+  const listEl = document.getElementById('list');
+  const RE = /(第\s*[一二三四五六七八九十0-9]+\s*課)\s*/; // 例：第1課 / 第一課
+
+  function applyBreak() {
+    listEl.querySelectorAll('.card .title').forEach(t => {
+      if (t.dataset.lessonBreakApplied) return;           // 避免重複處理
+      const raw = t.textContent || '';
+      if (!RE.test(raw)) return;
+      t.innerHTML = raw.replace(RE, '$1<br>');            // 在「第X課」後插入換行
+      t.dataset.lessonBreakApplied = '1';
+    });
+  }
+
+  applyBreak();
+  // 列表重新渲染（切科目/冊次）時自動再套用
+  new MutationObserver(applyBreak).observe(listEl, { childList: true });
+})();
+</script>
+
 
 </body>
 </html>
